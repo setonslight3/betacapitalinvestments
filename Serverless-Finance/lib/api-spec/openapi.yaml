@@ -1,0 +1,538 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: AlphaVest API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication
+  - name: investments
+    description: Investment management
+  - name: transactions
+    description: Transaction ledger
+  - name: notifications
+    description: Notifications
+  - name: portfolio
+    description: Portfolio summary
+  - name: profile
+    description: User profile
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Create a new account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "201":
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /investments:
+    get:
+      operationId: getInvestments
+      tags: [investments]
+      summary: List user investments
+      responses:
+        "200":
+          description: List of investments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Investment"
+    post:
+      operationId: createInvestment
+      tags: [investments]
+      summary: Create a new investment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentInput"
+      responses:
+        "201":
+          description: Investment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Investment"
+
+  /investments/{id}:
+    patch:
+      operationId: updateInvestment
+      tags: [investments]
+      summary: Update an investment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvestmentUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Investment"
+
+  /transactions:
+    get:
+      operationId: getTransactions
+      tags: [transactions]
+      summary: List user transactions
+      responses:
+        "200":
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Transaction"
+    post:
+      operationId: createTransaction
+      tags: [transactions]
+      summary: Create a transaction record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransactionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Transaction"
+
+  /notifications:
+    get:
+      operationId: getNotifications
+      tags: [notifications]
+      summary: List user notifications
+      responses:
+        "200":
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /notifications/read-all:
+    post:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      responses:
+        "200":
+          description: All marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /portfolio/summary:
+    get:
+      operationId: getPortfolioSummary
+      tags: [portfolio]
+      summary: Get portfolio summary
+      responses:
+        "200":
+          description: Portfolio summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortfolioSummary"
+
+  /liquidity:
+    get:
+      operationId: getLiquidity
+      tags: [portfolio]
+      summary: Get available liquidity balance
+      responses:
+        "200":
+          description: Liquidity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidityResponse"
+    patch:
+      operationId: updateLiquidity
+      tags: [portfolio]
+      summary: Adjust liquidity by delta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LiquidityUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LiquidityResponse"
+
+  /profile:
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      summary: Update user profile settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    UserProfile:
+      type: object
+      required: [id, email, fullName, tier, theme, biometricEnabled, liquidity]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        fullName:
+          type: string
+        tier:
+          type: string
+        theme:
+          type: string
+        biometricEnabled:
+          type: boolean
+        liquidity:
+          type: number
+        isAdmin:
+          type: ["boolean", "null"]
+        emailVerified:
+          type: ["boolean", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        bankName:
+          type: ["string", "null"]
+        bankAccountNumber:
+          type: ["string", "null"]
+        bankAccountName:
+          type: ["string", "null"]
+        cryptoWithdrawAddress:
+          type: ["string", "null"]
+        cryptoWithdrawNetwork:
+          type: ["string", "null"]
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    SignupInput:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+
+    Investment:
+      type: object
+      required: [id, sectorId, sectorTitle, amount, startDateStamp, daysActive, dailyRate, accruedYield, tierName, status]
+      properties:
+        id:
+          type: string
+        sectorId:
+          type: string
+        sectorTitle:
+          type: string
+        amount:
+          type: number
+        startDateStamp:
+          type: string
+        daysActive:
+          type: integer
+        dailyRate:
+          type: number
+        accruedYield:
+          type: number
+        tierName:
+          type: string
+        status:
+          type: string
+
+    InvestmentInput:
+      type: object
+      required: [sectorId, sectorTitle, amount, dailyRate, tierName]
+      properties:
+        sectorId:
+          type: string
+        sectorTitle:
+          type: string
+        amount:
+          type: number
+        dailyRate:
+          type: number
+        tierName:
+          type: string
+
+    InvestmentUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+        accruedYield:
+          type: number
+        daysActive:
+          type: integer
+
+    Transaction:
+      type: object
+      required: [id, type, fund, date, amount]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        fund:
+          type: string
+        date:
+          type: string
+        amount:
+          type: number
+
+    TransactionInput:
+      type: object
+      required: [type, fund, amount]
+      properties:
+        type:
+          type: string
+        fund:
+          type: string
+        amount:
+          type: number
+
+    Notification:
+      type: object
+      required: [id, title, message, timestamp, read, type]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+        read:
+          type: boolean
+        type:
+          type: string
+
+    PortfolioSummary:
+      type: object
+      required: [totalWealth, activePrincipal, totalROIReceived, liquidity, activeInvestmentCount]
+      properties:
+        totalWealth:
+          type: number
+        activePrincipal:
+          type: number
+        totalROIReceived:
+          type: number
+        liquidity:
+          type: number
+        activeInvestmentCount:
+          type: integer
+
+    LiquidityResponse:
+      type: object
+      required: [liquidity]
+      properties:
+        liquidity:
+          type: number
+
+    LiquidityUpdate:
+      type: object
+      required: [delta]
+      properties:
+        delta:
+          type: number
+
+    ProfileUpdate:
+      type: object
+      properties:
+        fullName:
+          type: string
+        theme:
+          type: string
+        biometricEnabled:
+          type: boolean
+        bankName:
+          type: string
+        bankAccountNumber:
+          type: string
+        bankAccountName:
+          type: string
+        cryptoWithdrawAddress:
+          type: string
+        cryptoWithdrawNetwork:
+          type: string
