@@ -28,29 +28,36 @@ router.post("/auth/biometric/register-options", async (req: Request, res: Respon
   const userId = req.session?.userId;
   if (!userId) { res.status(401).json({ message: "Not authenticated" }); return; }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  if (!user) { res.status(404).json({ message: "User not found" }); return; }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user) { res.status(404).json({ message: "User not found" }); return; }
 
-  const existingCreds = await db.select().from(biometricCredentialsTable).where(eq(biometricCredentialsTable.userId, userId));
+    const existingCreds = await db.select().from(biometricCredentialsTable).where(eq(biometricCredentialsTable.userId, userId));
 
-  const options = await generateRegistrationOptions({
-    rpName: RP_NAME,
-    rpID: RP_ID,
-    userName: user.email,
-    userDisplayName: user.fullName,
-    excludeCredentials: existingCreds.map(c => ({
-      id: c.id,
-      type: "public-key" as const,
-    })),
-    authenticatorSelection: {
-      residentKey: "preferred",
-      userVerification: "discouraged",
-      authenticatorAttachment: "platform",
-    },
-  });
+    req.log.info({ rpId: RP_ID, origin: ORIGIN }, "Generating biometric registration options");
 
-  req.session.webauthnChallenge = options.challenge;
-  res.json(options);
+    const options = await generateRegistrationOptions({
+      rpName: RP_NAME,
+      rpID: RP_ID,
+      userName: user.email,
+      userDisplayName: user.fullName,
+      excludeCredentials: existingCreds.map(c => ({
+        id: c.id,
+        type: "public-key" as const,
+      })),
+      authenticatorSelection: {
+        residentKey: "preferred",
+        userVerification: "preferred", // Changed from "discouraged" to be more compatible
+        // Removed authenticatorAttachment to allow both platform and cross-platform authenticators
+      },
+    });
+
+    req.session.webauthnChallenge = options.challenge;
+    res.json(options);
+  } catch (err) {
+    req.log.error({ err, rpId: RP_ID, origin: ORIGIN }, "Failed to generate biometric registration options");
+    res.status(500).json({ message: "Failed to generate registration options. Check server configuration." });
+  }
 });
 
 router.post("/auth/biometric/register", async (req: Request, res: Response) => {
@@ -62,6 +69,8 @@ router.post("/auth/biometric/register", async (req: Request, res: Response) => {
   if (!user) { res.status(404).json({ message: "User not found" }); return; }
 
   try {
+    req.log.info({ rpId: RP_ID, origin: ORIGIN }, "Verifying biometric registration");
+    
     const verification = await verifyRegistrationResponse({
       response: req.body,
       expectedChallenge: challenge,
@@ -70,6 +79,7 @@ router.post("/auth/biometric/register", async (req: Request, res: Response) => {
     });
 
     if (!verification.verified || !verification.registrationInfo) {
+      req.log.warn({ verification }, "Biometric registration not verified");
       res.status(400).json({ message: "Biometric registration failed" });
       return;
     }
@@ -96,9 +106,11 @@ router.post("/auth/biometric/register", async (req: Request, res: Response) => {
     await db.update(usersTable).set({ biometricEnabled: true }).where(eq(usersTable.id, userId));
 
     delete req.session.webauthnChallenge;
+    req.log.info({ userId }, "Biometric registration successful");
     res.json({ verified: true });
   } catch (err) {
-    res.status(400).json({ message: "Verification failed" });
+    req.log.error({ err, rpId: RP_ID, origin: ORIGIN }, "Biometric registration verification failed");
+    res.status(400).json({ message: `Verification failed: ${err instanceof Error ? err.message : 'Unknown error'}` });
   }
 });
 
@@ -106,31 +118,38 @@ router.post("/auth/biometric/login-options", async (req: Request, res: Response)
   const { email } = req.body;
   if (!email) { res.status(400).json({ message: "email required" }); return; }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase())).limit(1);
-  if (!user || !user.biometricEnabled) {
-    res.status(404).json({ message: "Biometric login not set up for this account" });
-    return;
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email.toLowerCase())).limit(1);
+    if (!user || !user.biometricEnabled) {
+      res.status(404).json({ message: "Biometric login not set up for this account" });
+      return;
+    }
+
+    const creds = await db.select().from(biometricCredentialsTable).where(eq(biometricCredentialsTable.userId, user.id));
+    if (creds.length === 0) {
+      res.status(404).json({ message: "No biometric credentials found" });
+      return;
+    }
+
+    req.log.info({ rpId: RP_ID, userId: user.id }, "Generating biometric login options");
+
+    const options = await generateAuthenticationOptions({
+      rpID: RP_ID,
+      allowCredentials: creds.map(c => ({
+        id: c.id,
+        type: "public-key" as const,
+        transports: [] as AuthenticatorTransportFuture[],
+      })),
+      userVerification: "preferred", // Changed from "discouraged"
+    });
+
+    req.session.webauthnChallenge = options.challenge;
+    req.session.webauthnEmail = email.toLowerCase();
+    res.json(options);
+  } catch (err) {
+    req.log.error({ err, rpId: RP_ID, origin: ORIGIN }, "Failed to generate biometric login options");
+    res.status(500).json({ message: "Failed to generate login options" });
   }
-
-  const creds = await db.select().from(biometricCredentialsTable).where(eq(biometricCredentialsTable.userId, user.id));
-  if (creds.length === 0) {
-    res.status(404).json({ message: "No biometric credentials found" });
-    return;
-  }
-
-  const options = await generateAuthenticationOptions({
-    rpID: RP_ID,
-    allowCredentials: creds.map(c => ({
-      id: c.id,
-      type: "public-key" as const,
-      transports: [] as AuthenticatorTransportFuture[],
-    })),
-    userVerification: "discouraged",
-  });
-
-  req.session.webauthnChallenge = options.challenge;
-  req.session.webauthnEmail = email.toLowerCase();
-  res.json(options);
 });
 
 router.post("/auth/biometric/login", async (req: Request, res: Response) => {

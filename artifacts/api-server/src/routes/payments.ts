@@ -66,9 +66,19 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
 
   const { amount } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
+  
+  // Enforce minimum deposit of $5,000
+  const MIN_DEPOSIT = 5000;
+  if (amount < MIN_DEPOSIT) {
+    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
+    return;
+  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    
+    req.log.info({ userId, amount, provider: "monnify" }, "Initializing Monnify payment");
+    
     const token = await monnifyToken();
     const baseUrl = process.env.MONNIFY_BASE_URL ?? "https://sandbox.monnify.com";
     const reference = `av_monnify_${Date.now()}_${userId}`;
@@ -80,7 +90,7 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
         customerName: user.fullName,
         customerEmail: user.email,
         paymentReference: reference,
-        paymentDescription: "BetterCapitalInvestment Deposit",
+        paymentDescription: "Beta Capital Investment Deposit",
         currencyCode: "NGN",
         contractCode: process.env.MONNIFY_CONTRACT_CODE,
         redirectUrl: `${process.env.FRONTEND_URL ?? ""}?deposit=success`,
@@ -96,10 +106,26 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
       metadata: JSON.stringify(resp.data.responseBody),
     });
 
+    req.log.info({ paymentId: payId, reference }, "Monnify payment initialized successfully");
     res.json({ checkoutUrl: resp.data.responseBody.checkoutUrl, reference, paymentId: payId });
   } catch (err: unknown) {
-    req.log.error({ err }, "Monnify init failed");
-    res.status(500).json({ message: "Failed to initialize Monnify payment" });
+    const errorDetails = err instanceof Error ? {
+      message: err.message,
+      ...(axios.isAxiosError(err) && {
+        status: err.response?.status,
+        data: err.response?.data,
+        config: {
+          url: err.config?.url,
+          baseURL: err.config?.baseURL,
+        }
+      })
+    } : { raw: String(err) };
+    
+    req.log.error({ err: errorDetails, userId, amount }, "Monnify init failed");
+    res.status(500).json({ 
+      message: "Failed to initialize Monnify payment",
+      ...(process.env.NODE_ENV !== "production" && { details: errorDetails })
+    });
   }
 });
 
@@ -145,18 +171,28 @@ router.post("/payments/paystack/initialize", async (req: Request, res: Response)
 
   const { amount } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
+  
+  // Enforce minimum deposit of $5,000
+  const MIN_DEPOSIT = 5000;
+  if (amount < MIN_DEPOSIT) {
+    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
+    return;
+  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    
+    req.log.info({ userId, amount, provider: "paystack" }, "Initializing Paystack payment");
+    
     const reference = `av_pstk_${Date.now()}_${userId}`;
-    // Paystack amount is in kobo (NGN) or USD cents — we'll use NGN kobo
-    const amountKobo = Math.round(amount * 100);
+    // Paystack amount is in kobo (NGN) or USD cents — we'll use USD cents
+    const amountCents = Math.round(amount * 100);
 
     const resp = await axios.post(
       "https://api.paystack.co/transaction/initialize",
       {
         email: user.email,
-        amount: amountKobo,
+        amount: amountCents,
         reference,
         currency: "USD",
         callback_url: `${process.env.FRONTEND_URL ?? ""}?deposit=success`,
@@ -172,10 +208,22 @@ router.post("/payments/paystack/initialize", async (req: Request, res: Response)
       metadata: JSON.stringify(resp.data.data),
     });
 
+    req.log.info({ paymentId: payId, reference }, "Paystack payment initialized successfully");
     res.json({ checkoutUrl: resp.data.data?.authorization_url, reference, paymentId: payId });
   } catch (err: unknown) {
-    req.log.error({ err }, "Paystack init failed");
-    res.status(500).json({ message: "Failed to initialize Paystack payment" });
+    const errorDetails = err instanceof Error ? {
+      message: err.message,
+      ...(axios.isAxiosError(err) && {
+        status: err.response?.status,
+        data: err.response?.data,
+      })
+    } : { raw: String(err) };
+    
+    req.log.error({ err: errorDetails, userId, amount }, "Paystack init failed");
+    res.status(500).json({ 
+      message: "Failed to initialize Paystack payment",
+      ...(process.env.NODE_ENV !== "production" && { details: errorDetails })
+    });
   }
 });
 
@@ -220,9 +268,19 @@ router.post("/payments/flutterwave/initialize", async (req: Request, res: Respon
 
   const { amount } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
+  
+  // Enforce minimum deposit of $5,000
+  const MIN_DEPOSIT = 5000;
+  if (amount < MIN_DEPOSIT) {
+    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
+    return;
+  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    
+    req.log.info({ userId, amount, provider: "flutterwave" }, "Initializing Flutterwave payment");
+    
     const txRef = `av_flw_${Date.now()}_${userId}`;
 
     const resp = await axios.post(
@@ -235,7 +293,7 @@ router.post("/payments/flutterwave/initialize", async (req: Request, res: Respon
         redirect_url: `${process.env.FRONTEND_URL ?? ""}?deposit=success`,
         customer: { email: user.email, name: user.fullName },
         customizations: {
-          title: "BetterCapitalInvestment Deposit",
+          title: "Beta Capital Investment Deposit",
           description: "Fund your investment account",
         },
       },
@@ -249,10 +307,22 @@ router.post("/payments/flutterwave/initialize", async (req: Request, res: Respon
       metadata: JSON.stringify({ link: resp.data.data?.link }),
     });
 
+    req.log.info({ paymentId: payId, reference: txRef }, "Flutterwave payment initialized successfully");
     res.json({ checkoutUrl: resp.data.data?.link, reference: txRef, paymentId: payId });
   } catch (err: unknown) {
-    req.log.error({ err }, "Flutterwave init failed");
-    res.status(500).json({ message: "Failed to initialize Flutterwave payment" });
+    const errorDetails = err instanceof Error ? {
+      message: err.message,
+      ...(axios.isAxiosError(err) && {
+        status: err.response?.status,
+        data: err.response?.data,
+      })
+    } : { raw: String(err) };
+    
+    req.log.error({ err: errorDetails, userId, amount }, "Flutterwave init failed");
+    res.status(500).json({ 
+      message: "Failed to initialize Flutterwave payment",
+      ...(process.env.NODE_ENV !== "production" && { details: errorDetails })
+    });
   }
 });
 
@@ -310,6 +380,13 @@ router.post("/payments/crypto/submit", async (req: Request, res: Response) => {
   const { amount, network, txHash } = req.body;
   if (!amount || !network || !txHash) {
     res.status(400).json({ message: "amount, network, and txHash required" });
+    return;
+  }
+  
+  // Enforce minimum deposit of $5,000
+  const MIN_DEPOSIT = 5000;
+  if (amount < MIN_DEPOSIT) {
+    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
     return;
   }
 

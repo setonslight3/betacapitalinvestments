@@ -10,7 +10,22 @@ if (!process.env.DATABASE_URL) {
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+// Parse DATABASE_URL and explicitly set SSL mode to avoid future deprecation warnings
+const databaseUrl = process.env.DATABASE_URL;
+const isProd = process.env.NODE_ENV === "production";
+
+// For production, explicitly use verify-full SSL mode as recommended
+// For development, allow connection without SSL
+const poolConfig: pg.PoolConfig = {
+  connectionString: databaseUrl,
+  ssl: isProd
+    ? {
+        rejectUnauthorized: true, // verify-full equivalent
+      }
+    : false,
+};
+
+export const pool = new Pool(poolConfig);
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";

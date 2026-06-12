@@ -72,6 +72,17 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { message: "Too many requests, please try again later." },
   skip: (req) => req.path === "/api/healthz",
+  // Fix for Netlify Functions - extract IP from headers
+  keyGenerator: (req) => {
+    return (
+      req.headers["x-nf-client-connection-ip"] ||
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.headers["x-real-ip"] ||
+      req.ip ||
+      req.socket?.remoteAddress ||
+      "unknown"
+    );
+  },
 });
 
 const authLimiter = rateLimit({
@@ -80,6 +91,17 @@ const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { message: "Too many authentication attempts. Try again in 15 minutes." },
+  // Fix for Netlify Functions - extract IP from headers
+  keyGenerator: (req) => {
+    return (
+      req.headers["x-nf-client-connection-ip"] ||
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.headers["x-real-ip"] ||
+      req.ip ||
+      req.socket?.remoteAddress ||
+      "unknown"
+    );
+  },
 });
 
 const PgStore = connectPgSimple(session);
