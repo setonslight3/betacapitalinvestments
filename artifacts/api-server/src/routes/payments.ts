@@ -64,20 +64,28 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
   if (enabled === "false") { res.status(503).json({ message: "Monnify is currently disabled" }); return; }
   if (!process.env.MONNIFY_API_KEY) { res.status(503).json({ message: "Monnify not configured" }); return; }
 
-  const { amount } = req.body;
+  const { amount } = req.body; // amount in USD
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
-  
-  // Enforce minimum deposit of $5,000
-  const MIN_DEPOSIT = 5000;
-  if (amount < MIN_DEPOSIT) {
-    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
-    return;
-  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     
-    req.log.info({ userId, amount, provider: "monnify" }, "Initializing Monnify payment");
+    req.log.info({ userId, amountUSD: amount, provider: "monnify" }, "Initializing Monnify payment");
+    
+    // Get current USD to NGN exchange rate
+    let usdToNgn = 1650; // Default fallback rate
+    try {
+      const forexResp = await axios.get("https://open.er-api.com/v6/latest/USD", { timeout: 5000 });
+      if (forexResp.data?.rates?.NGN) {
+        usdToNgn = forexResp.data.rates.NGN;
+      }
+    } catch (err) {
+      req.log.warn("Failed to fetch live forex rate, using fallback");
+    }
+    
+    // Convert USD to NGN
+    const amountNGN = Math.round(amount * usdToNgn);
+    req.log.info({ amountUSD: amount, amountNGN, rate: usdToNgn }, "Currency conversion for Monnify");
     
     const token = await monnifyToken();
     const baseUrl = process.env.MONNIFY_BASE_URL ?? "https://sandbox.monnify.com";
@@ -86,7 +94,7 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
     const resp = await axios.post(
       `${baseUrl}/api/v1/merchant/transactions/init-transaction`,
       {
-        amount,
+        amount: amountNGN, // Send NGN amount to Monnify
         customerName: user.fullName,
         customerEmail: user.email,
         paymentReference: reference,
@@ -102,11 +110,17 @@ router.post("/payments/monnify/initialize", async (req: Request, res: Response) 
     const payId = genId();
     await db.insert(paymentsTable).values({
       id: payId, userId, provider: "monnify", referenceId: reference,
-      amount, currency: "NGN", status: "pending",
-      metadata: JSON.stringify(resp.data.responseBody),
+      amount, // Store original USD amount
+      currency: "USD", // Store as USD in database
+      status: "pending",
+      metadata: JSON.stringify({ 
+        ...resp.data.responseBody,
+        amountNGN,
+        exchangeRate: usdToNgn,
+      }),
     });
 
-    req.log.info({ paymentId: payId, reference }, "Monnify payment initialized successfully");
+    req.log.info({ paymentId: payId, reference, amountUSD: amount, amountNGN }, "Monnify payment initialized successfully");
     res.json({ checkoutUrl: resp.data.responseBody.checkoutUrl, reference, paymentId: payId });
   } catch (err: unknown) {
     const errorDetails = err instanceof Error ? {
@@ -171,13 +185,6 @@ router.post("/payments/paystack/initialize", async (req: Request, res: Response)
 
   const { amount } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
-  
-  // Enforce minimum deposit of $5,000
-  const MIN_DEPOSIT = 5000;
-  if (amount < MIN_DEPOSIT) {
-    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
-    return;
-  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -268,13 +275,6 @@ router.post("/payments/flutterwave/initialize", async (req: Request, res: Respon
 
   const { amount } = req.body;
   if (!amount || amount <= 0) { res.status(400).json({ message: "Valid amount required" }); return; }
-  
-  // Enforce minimum deposit of $5,000
-  const MIN_DEPOSIT = 5000;
-  if (amount < MIN_DEPOSIT) {
-    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
-    return;
-  }
 
   try {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -380,13 +380,6 @@ router.post("/payments/crypto/submit", async (req: Request, res: Response) => {
   const { amount, network, txHash } = req.body;
   if (!amount || !network || !txHash) {
     res.status(400).json({ message: "amount, network, and txHash required" });
-    return;
-  }
-  
-  // Enforce minimum deposit of $5,000
-  const MIN_DEPOSIT = 5000;
-  if (amount < MIN_DEPOSIT) {
-    res.status(400).json({ message: `Minimum deposit is ${fmt(MIN_DEPOSIT)}` });
     return;
   }
 
