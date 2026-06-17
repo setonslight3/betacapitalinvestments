@@ -3,7 +3,7 @@ import {
   Users, TrendingUp, Wallet, Activity, Settings, Bell, CreditCard,
   BarChart3, Loader2, LogOut, RefreshCw, Edit3, Check, X, ChevronDown,
   Shield, AlertTriangle, CheckCircle2, DollarSign, Layers, FileText,
-  Download, ArrowDownLeft, ShieldCheck
+  Download, ArrowDownLeft, ShieldCheck, Copy
 } from 'lucide-react';
 import { ScreenType, UserSession } from '../types';
 import LogoIcon from './LogoIcon';
@@ -68,6 +68,7 @@ export default function AdminDashboard({ onNavigate, session, onLogout }: AdminD
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Edit states
   const [editingUser, setEditingUser] = useState<number | null>(null);
@@ -88,6 +89,16 @@ export default function AdminDashboard({ onNavigate, session, onLogout }: AdminD
   const showFeedback = (msg: string) => {
     setFeedback(msg);
     setTimeout(() => setFeedback(''), 4000);
+  };
+
+  const handleCopy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      setError('Failed to copy to clipboard');
+    }
   };
 
   const load = async (t: AdminTab) => {
@@ -575,14 +586,24 @@ export default function AdminDashboard({ onNavigate, session, onLogout }: AdminD
                           {w.method === 'bank' && (
                             <div className="text-[10px] font-sans text-brand-muted text-right leading-loose">
                               <div>{w.bankName}</div>
-                              <div className="font-mono">{w.bankAccountNumber}</div>
+                              <div className="flex items-center gap-1 justify-end">
+                                <span className="font-mono">{w.bankAccountNumber}</span>
+                                <button onClick={() => handleCopy(w.bankAccountNumber, `bank-${w.id}`)} className="text-brand-muted hover:text-brand-gold">
+                                  {copiedId === `bank-${w.id}` ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              </div>
                               <div>{w.bankAccountName}</div>
                             </div>
                           )}
                           {w.method === 'crypto' && (
                             <div className="text-[10px] font-sans text-brand-muted text-right leading-loose">
                               <div className="font-bold text-yellow-400">{w.cryptoNetwork}</div>
-                              <div className="font-mono truncate max-w-[180px]">{w.cryptoAddress}</div>
+                              <div className="flex items-center gap-1 justify-end">
+                                <span className="font-mono truncate max-w-[180px]">{w.cryptoAddress}</span>
+                                <button onClick={() => handleCopy(w.cryptoAddress, `crypto-${w.id}`)} className="text-brand-muted hover:text-brand-gold shrink-0">
+                                  {copiedId === `crypto-${w.id}` ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
+                                </button>
+                              </div>
                             </div>
                           )}
                           {w.method === 'paystack' && (
@@ -803,26 +824,6 @@ export default function AdminDashboard({ onNavigate, session, onLogout }: AdminD
                           <option value="true">Enabled</option>
                           <option value="false">Disabled</option>
                         </select>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Crypto Wallet Addresses */}
-                <div className="bg-brand-surface border border-brand-border rounded-lg p-5">
-                  <h3 className="text-xs font-bold text-brand-text mb-4 uppercase tracking-wider">Crypto Wallet Addresses</h3>
-                  <p className="text-[10px] text-brand-muted font-sans mb-4">Set the platform receiving addresses for crypto deposits. Leave blank to use environment variables.</p>
-                  <div className="space-y-3">
-                    {[
-                      { key: 'crypto_btc_address', label: 'Bitcoin (BTC)' },
-                      { key: 'crypto_usdt_trc20_address', label: 'USDT TRC-20' },
-                      { key: 'crypto_usdt_erc20_address', label: 'USDT ERC-20' },
-                      { key: 'crypto_eth_address', label: 'Ethereum (ETH)' },
-                      { key: 'crypto_sol_address', label: 'Solana (SOL)' },
-                    ].map(f => (
-                      <div key={f.key} className="grid grid-cols-3 gap-3 items-center">
-                        <label className="text-[10px] font-sans text-brand-muted uppercase tracking-wider">{f.label}</label>
-                        <input className={`${inputCls} col-span-2 font-mono text-[10px]`} value={settings[f.key] ?? ''} onChange={e => setSettings(p => ({ ...p, [f.key]: e.target.value }))} placeholder="Wallet address (optional)" />
                       </div>
                     ))}
                   </div>

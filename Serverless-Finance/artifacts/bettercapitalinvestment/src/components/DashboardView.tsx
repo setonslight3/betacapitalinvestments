@@ -131,9 +131,7 @@ export default function DashboardView({
     "All" | "ROI" | "Deposit" | "Withdrawal" | "Pledge"
   >("All");
   const [txSearch, setTxSearch] = useState("");
-  const [withdrawInvestment, setWithdrawInvestment] = useState<string | null>(
-    null,
-  );
+
   const [biometricLoading, setBiometricLoading] = useState(false);
   const [biometricMsg, setBiometricMsg] = useState("");
   const [showComingSoon, setShowComingSoon] = useState<string | null>(null);
@@ -283,39 +281,7 @@ export default function DashboardView({
     );
   };
 
-  const handleEarlyWithdraw = (invId: string) => {
-    const inv = investments.find((i) => i.id === invId);
-    if (!inv) return;
-    const penalty = inv.amount * 0.05;
-    const returned = inv.amount - penalty + inv.accruedYield;
-    updateInvestment.mutate(
-      { id: invId, data: { status: "withdrawn_early" } },
-      {
-        onSuccess: () => {
-          updateLiquidity.mutate({ data: { delta: returned } });
-          createTransaction.mutate({
-            data: {
-              type: "Pre-Maturity Penalty",
-              fund: `Early exit: ${inv.sectorTitle}`,
-              amount: -penalty,
-            },
-          });
-          createTransaction.mutate({
-            data: {
-              type: "Withdrawal",
-              fund: `${inv.sectorTitle} principal returned`,
-              amount: returned,
-            },
-          });
-          setWithdrawInvestment(null);
-          triggerFeedback(
-            `Position closed. ${fmt(returned)} returned after 5% early exit fee.`,
-          );
-          invalidateAll();
-        },
-      },
-    );
-  };
+
 
   const handleSaveProfile = (e: FormEvent) => {
     e.preventDefault();
@@ -828,14 +794,7 @@ export default function DashboardView({
                           {inv.id} · Started {inv.startDateStamp}
                         </p>
                       </div>
-                      {inv.status === "active" && (
-                        <button
-                          onClick={() => setWithdrawInvestment(inv.id)}
-                          className="text-xs text-brand-muted hover:text-red-400 border border-brand-border hover:border-red-400/30 px-3 py-1.5 rounded font-sans transition-colors flex items-center gap-1.5"
-                        >
-                          <Trash2 className="w-3 h-3" /> Close
-                        </button>
-                      )}
+
                     </div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       {[
@@ -1690,43 +1649,7 @@ export default function DashboardView({
         </div>
       )}
 
-      {/* Early withdraw confirm */}
-      {withdrawInvestment && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-brand-surface border border-red-500/30 rounded shadow-2xl w-full max-w-sm p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <AlertCircle className="w-5 h-5 text-red-400" />
-              <h3 className="text-lg font-semibold text-brand-text">
-                Early Exit Warning
-              </h3>
-            </div>
-            <p className="text-sm text-brand-muted font-sans leading-relaxed mb-6">
-              Closing this position before maturity incurs a{" "}
-              <span className="text-red-400 font-bold">5% penalty</span> on your
-              principal. Accrued yield will still be returned. This action
-              cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setWithdrawInvestment(null)}
-                className="flex-1 border border-brand-border text-brand-muted py-2.5 rounded text-xs font-sans font-semibold hover:text-brand-text transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleEarlyWithdraw(withdrawInvestment)}
-                disabled={updateInvestment.isPending}
-                className="flex-1 bg-red-600 text-white py-2.5 rounded text-xs font-sans font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 disabled:opacity-70"
-              >
-                {updateInvestment.isPending ? (
-                  <Loader2 className="animate-spin w-3.5 h-3.5" />
-                ) : null}
-                Close Position
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Coming Soon modal */}
       {showComingSoon && (

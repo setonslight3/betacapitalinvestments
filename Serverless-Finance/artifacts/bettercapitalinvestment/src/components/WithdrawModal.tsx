@@ -1,5 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
-import { X, Loader2, AlertCircle, Building2, Bitcoin, CheckCircle2, CreditCard } from 'lucide-react';
+import { X, Loader2, AlertCircle, Building2, Bitcoin, CheckCircle2 } from 'lucide-react';
 
 interface WithdrawModalProps {
   liquidity: number;
@@ -7,23 +7,20 @@ interface WithdrawModalProps {
   onSuccess: (newLiquidity: number) => void;
 }
 
-type Method = 'bank' | 'crypto' | 'paystack';
+type Method = 'bank' | 'crypto';
 
-const ALL_METHODS: { id: Method; label: string; icon: React.ReactNode; settingKey: string }[] = [
-  { id: 'bank', label: 'Bank Transfer', icon: <Building2 className="w-3.5 h-3.5" />, settingKey: 'withdraw_bank_enabled' },
-  { id: 'paystack', label: 'Paystack', icon: <CreditCard className="w-3.5 h-3.5" />, settingKey: 'withdraw_paystack_enabled' },
-  { id: 'crypto', label: 'Crypto', icon: <Bitcoin className="w-3.5 h-3.5" />, settingKey: 'withdraw_crypto_enabled' },
+const ALL_METHODS: { id: Method; label: string; icon: React.ReactNode }[] = [
+  { id: 'bank', label: 'Bank Transfer', icon: <Building2 className="w-3.5 h-3.5" /> },
+  { id: 'crypto', label: 'Crypto', icon: <Bitcoin className="w-3.5 h-3.5" /> },
 ];
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
 
 export default function WithdrawModal({ liquidity, onClose, onSuccess }: WithdrawModalProps) {
-  const [methodSettings, setMethodSettings] = useState<Record<string, string>>({});
-  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [method, setMethod] = useState<Method | null>(null);
   const [amount, setAmount] = useState('');
-  const [bankName, setBankName] = useState('');
+  const [bankName, setBankName] = useState('Chase Bank');
   const [bankAccountNumber, setBankAccountNumber] = useState('');
   const [bankAccountName, setBankAccountName] = useState('');
   const [cryptoAddress, setCryptoAddress] = useState('');
@@ -34,22 +31,10 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
   const [newBalance, setNewBalance] = useState(0);
 
   useEffect(() => {
-    fetch('/api/settings')
-      .then(r => r.json())
-      .then(d => {
-        setMethodSettings(d ?? {});
-        setSettingsLoaded(true);
-      })
-      .catch(() => setSettingsLoaded(true));
-  }, []);
-
-  const enabledMethods = ALL_METHODS.filter(m => methodSettings[m.settingKey] !== 'false');
-
-  useEffect(() => {
-    if (settingsLoaded && enabledMethods.length > 0 && method === null) {
-      setMethod(enabledMethods[0].id);
+    if (method === null) {
+      setMethod('bank');
     }
-  }, [settingsLoaded, enabledMethods.length]);
+  }, []);
 
   const parseAmount = () => {
     const n = parseFloat(amount);
@@ -91,29 +76,6 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
     }
   };
 
-  if (!settingsLoaded) {
-    return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div className="bg-brand-surface border border-brand-border rounded-xl w-full max-w-md shadow-2xl p-8 flex items-center justify-center">
-          <Loader2 className="w-6 h-6 animate-spin text-brand-gold" />
-        </div>
-      </div>
-    );
-  }
-
-  if (enabledMethods.length === 0) {
-    return (
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-brand-surface border border-brand-border rounded-xl w-full max-w-md shadow-2xl p-8 text-center" onClick={e => e.stopPropagation()}>
-          <AlertCircle className="w-10 h-10 text-yellow-400 mx-auto mb-3" />
-          <p className="text-brand-text font-serif font-bold text-lg mb-2">Withdrawals Unavailable</p>
-          <p className="text-brand-muted font-sans text-sm mb-5">All withdrawal methods are currently disabled. Please contact support.</p>
-          <button onClick={onClose} className="bg-brand-gold text-brand-bg font-sans font-bold text-xs px-6 py-2.5 rounded uppercase tracking-widest hover:brightness-110 transition-all">Close</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-brand-surface border border-brand-border rounded-xl w-full max-w-md shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
@@ -138,9 +100,9 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
           </div>
         ) : (
           <div className="p-5">
-            {/* Method selector — only enabled methods */}
+            {/* Method selector */}
             <div className="flex gap-1.5 mb-4">
-              {enabledMethods.map(m => (
+              {ALL_METHODS.map(m => (
                 <button
                   key={m.id}
                   onClick={() => { setMethod(m.id); setError(''); }}
@@ -181,12 +143,12 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
                 <>
                   <div>
                     <label className="block text-brand-muted font-sans text-xs mb-1">Bank Name</label>
-                    <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Zenith Bank"
+                    <input type="text" value={bankName} onChange={e => setBankName(e.target.value)} placeholder="e.g. Chase Bank"
                       className="w-full bg-brand-bg border border-brand-border rounded-lg px-3 py-2.5 text-brand-text font-sans text-sm focus:outline-none focus:border-brand-gold/60" />
                   </div>
                   <div>
                     <label className="block text-brand-muted font-sans text-xs mb-1">Account Number</label>
-                    <input type="text" value={bankAccountNumber} onChange={e => setBankAccountNumber(e.target.value)} placeholder="10-digit account number"
+                    <input type="text" value={bankAccountNumber} onChange={e => setBankAccountNumber(e.target.value)} placeholder="Your bank account number"
                       className="w-full bg-brand-bg border border-brand-border rounded-lg px-3 py-2.5 text-brand-text font-sans text-sm focus:outline-none focus:border-brand-gold/60" />
                   </div>
                   <div>
@@ -195,13 +157,6 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
                       className="w-full bg-brand-bg border border-brand-border rounded-lg px-3 py-2.5 text-brand-text font-sans text-sm focus:outline-none focus:border-brand-gold/60" />
                   </div>
                 </>
-              )}
-
-              {/* Paystack note */}
-              {method === 'paystack' && (
-                <div className="bg-brand-bg/60 border border-brand-border/60 rounded-lg p-3 text-xs font-sans text-brand-muted">
-                  Paystack will process your withdrawal to your registered Nigerian bank account. Admin will initiate the transfer on your behalf.
-                </div>
               )}
 
               {/* Crypto fields */}
@@ -223,7 +178,7 @@ export default function WithdrawModal({ liquidity, onClose, onSuccess }: Withdra
               )}
 
               <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-2.5">
-                <p className="text-yellow-400 font-sans text-xs">Withdrawals are subject to admin review (1–3 business days). Funds are deducted from your balance immediately pending approval.</p>
+                <p className="text-yellow-400 font-sans text-xs">Withdrawals are subject to admin review (1–3 business days). Withdrawals are only available after 30 days of investment. Funds are deducted from your balance immediately pending approval.</p>
               </div>
 
               <button

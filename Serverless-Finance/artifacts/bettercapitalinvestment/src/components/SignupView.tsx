@@ -1,11 +1,11 @@
 import { useState, FormEvent } from 'react';
-import { Lock, Loader2, ArrowLeft, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Lock, Loader2, ArrowLeft, Eye, EyeOff, CheckCircle2, Upload, Phone } from 'lucide-react';
 import { ScreenType } from '../types';
 import LogoIcon from './LogoIcon';
 import { useSignup } from '@workspace/api-client-react';
 import LegalModal from './LegalModal';
 
-type SignupUser = { email: string; fullName: string; tier: string; theme: string; biometricEnabled: boolean; isAdmin?: boolean; emailVerified?: boolean };
+type SignupUser = { email: string; fullName: string; tier: string; theme: string; biometricEnabled: boolean; isAdmin?: boolean; emailVerified?: boolean; isVerified?: boolean };
 
 interface SignupViewProps {
   onNavigate: (screen: ScreenType) => void;
@@ -15,12 +15,13 @@ interface SignupViewProps {
 export default function SignupView({ onNavigate, onSignupSuccess }: SignupViewProps) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [kycFile, setKycFile] = useState<File | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [errorText, setErrorText] = useState('');
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [legalModal, setLegalModal] = useState<'terms' | 'privacy' | null>(null);
 
   const signupMutation = useSignup();
@@ -40,57 +41,38 @@ export default function SignupView({ onNavigate, onSignupSuccess }: SignupViewPr
     setLegalModal(type);
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setKycFile(e.target.files[0]);
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setErrorText('');
     if (!fullName.trim()) { setErrorText('Please enter your full name.'); return; }
     if (!email.trim()) { setErrorText('Please enter your email address.'); return; }
+    if (!phoneNumber.trim()) { setErrorText('Please enter your phone number.'); return; }
     if (!password) { setErrorText('Please create a password.'); return; }
     if (password.length < 8) { setErrorText('Password must be at least 8 characters.'); return; }
     if (password !== confirmPassword) { setErrorText('Passwords do not match.'); return; }
+    if (!kycFile) { setErrorText('Please upload a KYC document.'); return; }
     if (!agreed) { setErrorText('Please agree to the terms and conditions.'); return; }
 
-    signupMutation.mutate(
-      { data: { email, password, fullName } },
-      {
-        onSuccess: (data) => {
-          const user = data as SignupUser;
-          if (user.emailVerified) {
-            // Auto-verified (no email service configured) — go directly to dashboard
-            onSignupSuccess(user);
-          } else {
-            // Email service is active — go through OTP verification
-            onSignupSuccess(email);
-          }
-        },
-        onError: (err: unknown) => {
-          const anyErr = err as { response?: { data?: { message?: string } } };
-          if (anyErr?.response?.data?.message?.includes('already')) {
-            setErrorText('An account with this email already exists. Please sign in.');
-          } else {
-            setErrorText('Failed to create account. Please try again.');
-          }
-        },
-      }
-    );
-  };
-
-  const handleGoogleSignup = async () => {
-    setGoogleLoading(true);
-    setErrorText('');
     try {
-      const r = await fetch('/api/auth/google/redirect');
-      if (r.status === 503) {
-        setErrorText('Google sign-up is not yet configured. Please create an account with email below, or ask the admin to add Google OAuth credentials.');
-        setGoogleLoading(false);
-        return;
+      const userData = await signupMutation.mutateAsync({ data: { email, password, fullName } });
+
+      onSignupSuccess({
+        ...userData as SignupUser,
+        isVerified: false
+      });
+    } catch (err: unknown) {
+      const anyErr = err as { response?: { data?: { message?: string } } };
+      if (anyErr?.response?.data?.message?.includes('already')) {
+        setErrorText('An account with this email already exists. Please sign in.');
+      } else {
+        setErrorText('Failed to create account. Please try again.');
       }
-      if (!r.ok) { setErrorText('Google sign-up unavailable.'); setGoogleLoading(false); return; }
-      const { url } = await r.json();
-      window.location.href = url;
-    } catch {
-      setErrorText('Google sign-up unavailable.');
-      setGoogleLoading(false);
     }
   };
 
@@ -124,30 +106,6 @@ export default function SignupView({ onNavigate, onSignupSuccess }: SignupViewPr
                 </div>
               )}
 
-              {/* Google Sign Up */}
-              <button
-                type="button"
-                onClick={handleGoogleSignup}
-                disabled={googleLoading}
-                className="w-full flex items-center justify-center gap-3 border border-brand-border bg-brand-bg hover:border-brand-gold/50 text-brand-text text-sm font-sans py-3 rounded-lg mb-4 transition-all disabled:opacity-60"
-              >
-                {googleLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                  </svg>
-                )}
-                <span>{googleLoading ? 'Redirecting...' : 'Sign Up with Google'}</span>
-              </button>
-
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex-1 h-px bg-brand-border" />
-                <span className="text-[10px] text-brand-muted font-sans uppercase tracking-wider">or email</span>
-                <div className="flex-1 h-px bg-brand-border" />
-              </div>
-
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <div className="space-y-1">
                   <label className="block text-[11px] font-sans font-semibold text-brand-muted uppercase tracking-wider">Full Name</label>
@@ -171,6 +129,21 @@ export default function SignupView({ onNavigate, onSignupSuccess }: SignupViewPr
                     autoComplete="email"
                     className="w-full bg-brand-bg border border-brand-border py-3 px-4 text-brand-text placeholder-brand-muted/30 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 rounded-lg transition-all font-sans"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-sans font-semibold text-brand-muted uppercase tracking-wider">Phone Number</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-muted" />
+                    <input
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                      autoComplete="tel"
+                      className="w-full bg-brand-bg border border-brand-border py-3 pl-11 pr-4 text-brand-text placeholder-brand-muted/30 focus:border-brand-gold focus:outline-none focus:ring-1 focus:ring-brand-gold/20 rounded-lg transition-all font-sans"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -215,7 +188,33 @@ export default function SignupView({ onNavigate, onSignupSuccess }: SignupViewPr
                   </div>
                 </div>
 
-                {/* Terms checkbox */}
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-sans font-semibold text-brand-muted uppercase tracking-wider">KYC Document</label>
+                  <div className="relative border-2 border-dashed border-brand-border bg-brand-bg rounded-lg p-6 hover:border-brand-gold/40 transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <div className="text-center">
+                      {kycFile ? (
+                        <>
+                          <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
+                          <p className="text-sm text-brand-text font-medium">{kycFile.name}</p>
+                          <p className="text-xs text-brand-muted font-sans mt-1">{(kycFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-8 h-8 text-brand-gold mx-auto mb-2" />
+                          <p className="text-sm text-brand-text font-medium">Upload KYC Document</p>
+                          <p className="text-xs text-brand-muted font-sans mt-1">Passport, Driver's License, or Utility Bill (PDF or Image)</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-start gap-3">
                   <div
                     className="relative mt-0.5 shrink-0 cursor-pointer"

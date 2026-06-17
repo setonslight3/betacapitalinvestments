@@ -27,6 +27,8 @@ export function serializeUser(user: typeof usersTable.$inferSelect) {
     id: user.id,
     email: user.email,
     fullName: user.fullName,
+    phoneNumber: user.phoneNumber,
+    accountStatus: user.accountStatus,
     tier: user.tier,
     theme: user.theme,
     biometricEnabled: user.biometricEnabled,
@@ -51,8 +53,8 @@ export function tierFromWealth(wealth: number): string {
 }
 
 router.post("/auth/signup", async (req: Request, res: Response) => {
-  const { email, password, fullName } = req.body;
-  if (!email || !password || !fullName) {
+  const { email, password, fullName, phoneNumber } = req.body;
+  if (!email || !password || !fullName || !phoneNumber) {
     res.status(400).json({ message: "All fields required" });
     return;
   }
@@ -78,9 +80,11 @@ router.post("/auth/signup", async (req: Request, res: Response) => {
     .values({
       email: email.toLowerCase(),
       fullName,
+      phoneNumber,
       passwordHash,
       isAdmin: admin,
       emailVerified: autoVerify,
+      accountStatus: admin ? "approved" : "pending",
       tier: "Bronze Ore",
       theme: "sovereign",
       biometricEnabled: false,

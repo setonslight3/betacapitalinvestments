@@ -80,14 +80,13 @@ function TermsContent() {
       </Section>
 
       <Section title="4. Deposits & Withdrawals">
-        Deposits are processed via bank transfer (Monnify), card payment (Flutterwave), or cryptocurrency (BTC, USDT).
-        Withdrawals are subject to verification. Early withdrawal before plan maturity incurs a 5% exit fee on principal.
-        Processing times vary by payment provider (typically 1–5 business days).
+        Deposits are processed via cryptocurrency (BTC, USDT).
+        Withdrawals are subject to verification and are available after the 30-day investment term.
+        Processing times vary (typically 1–3 business days).
       </Section>
 
       <Section title="5. Fees">
-        BetterCapitalInvestment charges no platform subscription fee. Early-exit fees (5% of principal) apply to pre-maturity
-        withdrawals. Payment provider fees may apply and are charged separately by the respective providers.
+        BetterCapitalInvestment charges no platform subscription fee. No early withdrawal is permitted before the 30-day term.
       </Section>
 
       <Section title="6. Prohibited Conduct">
@@ -136,9 +135,9 @@ function PrivacyContent() {
 
       <Section title="1. Information We Collect">
         <ul className="list-disc pl-4 space-y-1 mt-1">
-          <li><strong>Account data:</strong> Name, email address, password (hashed), profile photo</li>
+          <li><strong>Account data:</strong> Name, email address, phone number, password (hashed), profile photo</li>
           <li><strong>Financial data:</strong> Investment amounts, transaction history, wallet addresses</li>
-          <li><strong>Authentication data:</strong> Google OAuth tokens, WebAuthn biometric credential IDs</li>
+          <li><strong>Authentication data:</strong> WebAuthn biometric credential IDs</li>
           <li><strong>Usage data:</strong> IP address, browser type, pages visited, time on Platform</li>
           <li><strong>Communication data:</strong> Support enquiries, email correspondence</li>
         </ul>
@@ -164,8 +163,6 @@ function PrivacyContent() {
       <Section title="4. Data Sharing">
         BetterCapitalInvestment does not sell your personal data. We may share data with:
         <ul className="list-disc pl-4 space-y-1 mt-1">
-          <li><strong>Payment processors</strong> (Monnify, Flutterwave) — solely to process your transactions</li>
-          <li><strong>Google</strong> — if you choose to sign in with Google</li>
           <li><strong>Legal authorities</strong> — when required by law, regulation, or court order</li>
         </ul>
       </Section>

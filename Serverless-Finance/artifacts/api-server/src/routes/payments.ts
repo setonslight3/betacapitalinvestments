@@ -307,15 +307,16 @@ router.post("/payments/crypto/submit", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { amount, network, txHash } = req.body;
-  if (!amount || !network || !txHash) {
-    res.status(400).json({ message: "amount, network, and txHash required" });
+  const { amount, network, receiptImageBase64, receiptFileName, receiptMimeType, txHash } = req.body;
+  if (!amount || !network || !receiptImageBase64 || !receiptFileName || !receiptMimeType) {
+    res.status(400).json({ message: "amount, network, receiptImageBase64, receiptFileName, and receiptMimeType required" });
     return;
   }
 
   const payId = genId();
   await db.insert(paymentsTable).values({
     id: payId, userId, provider: "crypto", txHash,
+    receiptImageBase64, receiptFileName, receiptMimeType,
     amount, currency: "USD", status: "manual_review",
     metadata: JSON.stringify({ network }),
   });
@@ -324,7 +325,7 @@ router.post("/payments/crypto/submit", async (req: Request, res: Response) => {
   await db.insert(notificationsTable).values({
     id: notifId, userId,
     title: "Crypto Deposit Submitted",
-    message: `Your ${network} deposit of ${fmt(amount)} is under review. Funds will be credited within 1–3 hours after confirmation.`,
+    message: `Your ${network} deposit of ${fmt(amount)} is under review. Funds will be credited after admin verification.`,
     timestamp: new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }),
     read: false, type: "info",
   });

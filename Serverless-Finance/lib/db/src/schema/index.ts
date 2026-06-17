@@ -6,11 +6,13 @@ export const usersTable = pgTable("users", {
   id: serial("id").primaryKey(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   fullName: text("full_name").notNull(),
+  phoneNumber: varchar("phone_number", { length: 50 }),
   passwordHash: text("password_hash"),
   googleId: varchar("google_id", { length: 255 }),
   avatarUrl: text("avatar_url"),
   isAdmin: boolean("is_admin").notNull().default(false),
   emailVerified: boolean("email_verified").notNull().default(false),
+  accountStatus: varchar("account_status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected
   tier: varchar("tier", { length: 50 }).notNull().default("Gold Ore"),
   theme: varchar("theme", { length: 50 }).notNull().default("sovereign"),
   biometricEnabled: boolean("biometric_enabled").notNull().default(false),
@@ -51,6 +53,9 @@ export const paymentsTable = pgTable("payments", {
   provider: varchar("provider", { length: 30 }).notNull(), // monnify | flutterwave | paystack | crypto
   referenceId: varchar("reference_id", { length: 255 }),
   txHash: text("tx_hash"),
+  receiptImageBase64: text("receipt_image_base64"),
+  receiptFileName: text("receipt_file_name"),
+  receiptMimeType: varchar("receipt_mime_type", { length: 50 }),
   amount: real("amount").notNull(),
   currency: varchar("currency", { length: 10 }).notNull().default("USD"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | success | failed | manual_review

@@ -78,6 +78,34 @@ function useLivePrices(): TickerItem[] {
   return tickers;
 }
 
+function useInView(ref: React.RefObject<HTMLElement>) {
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) {
+        observer.unobserve(ref.current);
+      }
+    };
+  }, [ref]);
+
+  return inView;
+}
+
 export default function LandingView({ onNavigate, session, onLogout, onUpdateTheme }: LandingViewProps) {
   const [showProspectus, setShowProspectus] = useState(false);
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -85,8 +113,24 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
   const [showComingSoonSector, setShowComingSoonSector] = useState<string | null>(null);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const platform = usePlatform();
-  const sectorsRef = useRef<HTMLElement>(null);
+  
+  const heroRef = useRef<HTMLElement>(null);
+  const statsRef = useRef<HTMLElement>(null);
+  const whyRef = useRef<HTMLElement>(null);
   const plansRef = useRef<HTMLElement>(null);
+  const sectorsRef = useRef<HTMLElement>(null);
+  const chartsRef = useRef<HTMLElement>(null);
+  const faqRef = useRef<HTMLElement>(null);
+  const ctaRef = useRef<HTMLElement>(null);
+
+  const heroInView = useInView(heroRef);
+  const statsInView = useInView(statsRef);
+  const whyInView = useInView(whyRef);
+  const plansInView = useInView(plansRef);
+  const sectorsInView = useInView(sectorsRef);
+  const chartsInView = useInView(chartsRef);
+  const faqInView = useInView(faqRef);
+  const ctaInView = useInView(ctaRef);
 
   const tickers = useLivePrices();
 
@@ -95,6 +139,24 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
 
   return (
     <div className="min-h-screen bg-brand-bg text-brand-text flex flex-col font-serif relative overflow-x-hidden">
+      <style>{`
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        .animate-fadeInUp { animation: fadeInUp 0.8s ease-out forwards; }
+        .animate-fadeIn { animation: fadeIn 1s ease-out forwards; }
+        .animate-delay-100 { animation-delay: 0.1s; }
+        .animate-delay-200 { animation-delay: 0.2s; }
+        .animate-delay-300 { animation-delay: 0.3s; }
+        .animate-delay-400 { animation-delay: 0.4s; }
+        .animate-delay-500 { animation-delay: 0.5s; }
+        .opacity-0 { opacity: 0; }
+      `}</style>
 
       {/* ── Contact Top Bar ── */}
       <div className="bg-brand-surface border-b border-brand-border/60 hidden md:block">
@@ -191,7 +253,7 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
 
       <main>
         {/* ── Hero ── */}
-        <section className="relative min-h-[780px] flex items-center px-6 md:px-16 overflow-hidden">
+        <section ref={heroRef as any} className="relative min-h-[780px] flex items-center px-6 md:px-16 overflow-hidden">
           <div className="absolute inset-0 z-0 opacity-35 pointer-events-none">
             <img alt="Finance district skyline" className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1920&q=80" />
             <div className="absolute inset-0 bg-gradient-to-b from-brand-bg/20 via-brand-bg/60 to-brand-bg" />
@@ -222,7 +284,7 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
         </section>
 
         {/* ── Stats ── */}
-        <section className="py-16 px-6 md:px-16 bg-brand-bg border-y border-brand-border">
+        <section ref={statsRef as any} className="py-16 px-6 md:px-16 bg-brand-bg border-y border-brand-border">
           <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
               { value: '$2.4B+', label: 'Assets Under Management' },
@@ -239,7 +301,7 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
         </section>
 
         {/* ── Why BetterCapitalInvestment ── */}
-        <section id="why" className="py-24 px-6 md:px-16 bg-brand-bg">
+        <section id="why" ref={whyRef as any} className="py-24 px-6 md:px-16 bg-brand-bg">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
               <span className="text-brand-gold text-xs tracking-widest font-bold block uppercase mb-2 font-sans">Secure & Trusted</span>
@@ -397,29 +459,7 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
           </div>
         </section>
 
-        {/* ── Payment Methods ── */}
-        <section className="py-16 px-6 md:px-16 bg-brand-surface/20 border-y border-brand-border">
-          <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-8">
-              <span className="text-brand-gold text-xs tracking-widest font-bold block uppercase mb-2 font-sans">Trusted & Verified</span>
-              <h2 className="text-2xl md:text-3xl text-brand-text mb-3">Deposit & Withdrawal Methods</h2>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { name: 'Paystack', desc: 'Card & bank transfer', icon: '💳' },
-                { name: 'Flutterwave', desc: 'Global payments', icon: '🌍' },
-                { name: 'Monnify', desc: 'NGN bank transfer', icon: '🏦' },
-                { name: 'Crypto', desc: 'BTC · ETH · USDT · SOL', icon: '₿' },
-              ].map(m => (
-                <div key={m.name} className="bg-brand-surface border border-brand-border rounded-lg p-4 text-center hover:border-brand-gold/40 transition-colors">
-                  <div className="text-2xl mb-2">{m.icon}</div>
-                  <div className="text-sm font-semibold text-brand-text mb-1">{m.name}</div>
-                  <div className="text-[11px] text-brand-muted font-sans">{m.desc}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+
 
         {/* ── FAQ ── */}
         <section className="py-24 px-6 md:px-16 bg-brand-bg">
@@ -589,7 +629,7 @@ export default function LandingView({ onNavigate, session, onLogout, onUpdateThe
               </div>
               <div>
                 <h3 className="text-brand-text font-bold mb-2">Withdrawal Policy</h3>
-                <p>Withdrawals are processed within 1–3 business days after admin review. Early exit from an active position incurs a 5% penalty on principal. Accrued yield is always returned.</p>
+                <p>Withdrawals are processed within 1–3 business days after admin review. Investments have a 30-day term; withdrawals are available after maturity.</p>
               </div>
               <div>
                 <h3 className="text-brand-text font-bold mb-2">KYC / AML</h3>

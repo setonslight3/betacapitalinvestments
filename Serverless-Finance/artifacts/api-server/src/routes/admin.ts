@@ -141,8 +141,8 @@ router.get("/admin/metrics", requireAdmin, async (_req: Request, res: Response) 
 router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) => {
   const users = await db.select().from(usersTable).orderBy(desc(usersTable.createdAt));
   res.json(users.map((u) => ({
-    id: u.id, email: u.email, fullName: u.fullName, tier: u.tier,
-    isAdmin: u.isAdmin, emailVerified: u.emailVerified,
+    id: u.id, email: u.email, fullName: u.fullName, phoneNumber: u.phoneNumber, tier: u.tier,
+    isAdmin: u.isAdmin, emailVerified: u.emailVerified, accountStatus: u.accountStatus,
     liquidity: u.liquidity, theme: u.theme, createdAt: u.createdAt,
     googleId: !!u.googleId,
     bankName: u.bankName, bankAccountNumber: u.bankAccountNumber,
@@ -154,17 +154,38 @@ router.get("/admin/users", requireAdmin, async (_req: Request, res: Response) =>
 
 router.patch("/admin/users/:id", requireAdmin, async (req: Request, res: Response) => {
   const id = Number(req.params.id);
-  const { tier, isAdmin, emailVerified, liquidity, fullName } = req.body;
+  const { tier, isAdmin, emailVerified, liquidity, fullName, accountStatus, phoneNumber } = req.body;
   const updates: Partial<typeof usersTable.$inferInsert> = {};
   if (tier !== undefined) updates.tier = tier;
   if (isAdmin !== undefined) updates.isAdmin = isAdmin;
   if (emailVerified !== undefined) updates.emailVerified = emailVerified;
   if (liquidity !== undefined) updates.liquidity = liquidity;
   if (fullName !== undefined) updates.fullName = fullName;
+  if (accountStatus !== undefined) updates.accountStatus = accountStatus;
+  if (phoneNumber !== undefined) updates.phoneNumber = phoneNumber;
 
   const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
   if (!user) { res.status(404).json({ message: "User not found" }); return; }
-  res.json({ id: user.id, email: user.email, fullName: user.fullName, tier: user.tier, isAdmin: user.isAdmin, liquidity: user.liquidity, emailVerified: user.emailVerified });
+  
+  // Send notification if account status changed to approved/rejected
+  if (accountStatus !== undefined) {
+    const notifId = `notif_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    await db.insert(notificationsTable).values({
+      id: notifId,
+      userId: user.id,
+      title: accountStatus === "approved" ? "Account Approved" : accountStatus === "rejected" ? "Account Rejected" : "Account Status Updated",
+      message: accountStatus === "approved" 
+        ? "Your account has been approved! You can now start investing." 
+        : accountStatus === "rejected" 
+        ? "Your account has been rejected. Please contact support for more information." 
+        : "Your account status has been updated.",
+      timestamp: new Date().toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" }),
+      read: false,
+      type: accountStatus === "approved" ? "success" : accountStatus === "rejected" ? "alert" : "info",
+    });
+  }
+  
+  res.json({ id: user.id, email: user.email, fullName: user.fullName, tier: user.tier, isAdmin: user.isAdmin, liquidity: user.liquidity, emailVerified: user.emailVerified, accountStatus: user.accountStatus, phoneNumber: user.phoneNumber });
 });
 
 router.delete("/admin/users/:id", requireAdmin, async (req: Request, res: Response) => {
@@ -239,6 +260,8 @@ router.get("/admin/payments", requireAdmin, async (_req: Request, res: Response)
     provider: paymentsTable.provider,
     referenceId: paymentsTable.referenceId,
     txHash: paymentsTable.txHash,
+    receiptFileName: paymentsTable.receiptFileName,
+    receiptMimeType: paymentsTable.receiptMimeType,
     amount: paymentsTable.amount,
     currency: paymentsTable.currency,
     status: paymentsTable.status,
@@ -251,6 +274,16 @@ router.get("/admin/payments", requireAdmin, async (_req: Request, res: Response)
     .leftJoin(usersTable, eq(paymentsTable.userId, usersTable.id))
     .orderBy(desc(paymentsTable.createdAt));
   res.json(payments);
+});
+
+router.get("/admin/payments/:id/receipt", requireAdmin, async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const [payment] = await db.select().from(paymentsTable).where(eq(paymentsTable.id, id)).limit(1);
+  if (!payment || !payment.receiptImageBase64) { res.status(404).json({ message: "Receipt not found" }); return; }
+  const buffer = Buffer.from(payment.receiptImageBase64, "base64");
+  res.setHeader("Content-Type", payment.receiptMimeType ?? "application/octet-stream");
+  res.setHeader("Content-Disposition", `attachment; filename="${payment.receiptFileName ?? "receipt"}"`);
+  res.send(buffer);
 });
 
 router.patch("/admin/payments/:id", requireAdmin, async (req: Request, res: Response) => {

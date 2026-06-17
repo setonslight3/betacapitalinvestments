@@ -1,4 +1,4 @@
-export type ScreenType = 'landing' | 'login' | 'signup' | 'dashboard' | 'verify-email' | 'forgot-password' | 'admin';
+export type ScreenType = 'landing' | 'login' | 'signup' | 'dashboard' | 'verify-email' | 'forgot-password' | 'admin' | 'pending-verification';
 
 export type ColorThemeType = 'sovereign' | 'royal-marine' | 'emerald-reserve' | 'emperor-purple';
 

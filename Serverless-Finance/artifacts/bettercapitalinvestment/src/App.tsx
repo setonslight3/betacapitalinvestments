@@ -7,6 +7,7 @@ import DashboardView from "./components/DashboardView";
 import OTPVerifyView from "./components/OTPVerifyView";
 import ForgotPasswordView from "./components/ForgotPasswordView";
 import AdminDashboard from "./components/AdminDashboard";
+import PendingVerificationView from "./components/PendingVerificationView";
 import CookieConsent from "./components/CookieConsent";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import { PlatformProvider } from "./context/PlatformContext";
@@ -224,14 +225,8 @@ function AppInner() {
   };
 
   const handleSignupSuccess = (emailOrUser: string | SignupUser) => {
-    if (typeof emailOrUser === "string") {
-      // Email service active — go to OTP verification screen
-      setVerifyEmail(emailOrUser);
-      handleNavigate("verify-email");
-    } else {
-      // Auto-verified (no email service) — go directly to dashboard
-      handleLoginSuccess(emailOrUser);
-    }
+    // Always redirect to pending verification page
+    handleNavigate("pending-verification");
   };
 
   const handleVerified = () => {
@@ -329,6 +324,8 @@ function AppInner() {
           onVerified={handleVerified}
         />
       );
+    case "pending-verification":
+      return <PendingVerificationView onNavigate={handleNavigate} />;
     case "forgot-password":
       return <ForgotPasswordView onNavigate={handleNavigate} />;
     case "dashboard":
